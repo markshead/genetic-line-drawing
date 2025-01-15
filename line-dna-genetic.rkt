@@ -1,7 +1,7 @@
 #lang racket
 
 (require racket/gui/base)
-
+(require future-visualizer)
 (define img-width 250)
 (define img-height 250)
 (define frame (new frame% [label "Frame"] [width img-width] [height (+ 30 img-height)]))
@@ -98,16 +98,28 @@
         ((>= x img-width) (fitness-of-image 0 (+ 1 y) candidate-dc target-dc accumulator))
         (#t (fitness-of-image (+ 1 x) y candidate-dc target-dc (+ accumulator (fitness-of-pixel x y candidate-dc target-dc))))))
 
-(define (fitness-of-image-section x y candidate-dc target-dc accumulator (start-y 0) (end-y img-width))
-  (cond ((and (>= x img-width) (>= y end-y)) accumulator)
-        ((>= x img-width) (fitness-of-image-section 0 (+ 1 y) candidate-dc target-dc accumulator start-y end-y))
-        (#t (fitness-of-image-section (+ 1 x) y candidate-dc target-dc (+ accumulator (fitness-of-image-section x y candidate-dc target-dc start-y end-y))))
-        ))
+; Using futures just slowed it down
+#; (define (fitness-of-image-section x y candidate-dc target-dc accumulator start-y end-y)
+ ; (printf "x=~a y=~a~n" x y)
+  (cond [(and (>= x img-width) (>= y end-y)) accumulator]
+        [(>= x img-width) (fitness-of-image-section 0 (+ 1 y) candidate-dc target-dc accumulator start-y end-y)]
+        [#t (fitness-of-image-section (+ 1 x) y candidate-dc target-dc (+ accumulator (fitness-of-pixel x y candidate-dc target-dc)) start-y end-y)]))
 
 (define (fitness-of-dna dna candidate-dc target-dc)
   (send candidate-dc clear)
   (drawing dna candidate-dc)
-  (fitness-of-image 0 0 candidate-dc target-dc 0))
+
+  (fitness-of-image 0 0 candidate-dc target-dc 0)
+
+
+  #;(let ([ a (future (lambda () (fitness-of-image-section 0 0   candidate-dc target-dc 0 0   50)))]
+        [ b (future (lambda () (fitness-of-image-section 0 50 candidate-dc target-dc 0 50 100)))]
+        [ c (future (lambda () (fitness-of-image-section 0 100 candidate-dc target-dc 0 100 150)))]
+        [ d (future (lambda () (fitness-of-image-section 0 150 candidate-dc target-dc 0 150 200)))]
+        [ e (future (lambda () (fitness-of-image-section 0 200 candidate-dc target-dc 0 200 250)))]
+        )
+    (+ (touch a) (touch b) (touch c) (touch d) (touch e))))
+
 
 ;; This mutates entire lines but as the image got closer to the target
 ;; changing multiple lines were very rarely an improvement.
@@ -1180,5 +1192,13 @@
                (60 29 113 26)
                (86 202 51 91)
                (63 131 148 245)))
+;; 5 in parallel
+;;cpu time: 26042 real time: 29198 gc time: 3393
+;;cpu time: 24042 real time: 28212 gc time: 1688
+;;cpu time: 25317 real time: 31306 gc time: 1987
+;; without parallelization
+;;cpu time: 22793 real time: 26857 gc time: 1614
+;;cpu time: 23425 real time: 28410 gc time: 1700
+;;cpu time: 23069 real time: 27189 gc time: 1654
 
-(evolve candidate-dc target-dc 100000 500k)
+(evolve candidate-dc target-dc 250000 500k)
